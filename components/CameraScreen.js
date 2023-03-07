@@ -9,6 +9,10 @@ import {
 } from "react-native";
 import { Camera } from "expo-camera";
 import { Video } from "expo-av";
+import MailComposer from 'expo-mail-composer';
+import ImagePicker from 'expo-image-picker';
+
+
 
 const WINDOW_HEIGHT = Dimensions.get("window").height;
 
@@ -22,7 +26,9 @@ export function CameraScreen() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isVideoRecording, setIsVideoRecording] = useState(false);
   const [videoSource, setVideoSource] = useState(null);
+  const [file, setImage] = useState(null);
   const cameraRef = useRef();
+  const [status, setStatus] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -35,17 +41,63 @@ export function CameraScreen() {
     setIsCameraReady(true);
   };
 
+ 
+
+  
+
   const takePicture = async () => {
     if (cameraRef.current) {
+      console.log("I'm in take Picture with cameraRef = current");
       const options = { quality: 0.5, base64: true, skipProcessing: true };
       const data = await cameraRef.current.takePictureAsync(options);
-      const source = data.uri;
-      if (source) {
+      global.source = data.uri;
+      if (global.source) {
         await cameraRef.current.pausePreview();
         setIsPreview(true);
-        console.log("picture source", source);
+        console.log("picture source", global.source);
+        
+        }
+
       }
+    };
+
+    const sendMail = async() => {
+      var options = {}
+      console.log("in sendMail, WTF with source = ",source)
+      if(source.length < 1){
+        console.log("global source is less than 1")
+        options = {
+          subject: "Sending email with out attachment",
+          recipients: ["vannorton@gmail.com"],
+          body: "Enter email body here..."
+        }
+      }else{
+        console.log("global source is greater than 1")
+        options = {
+        subject: "Sending email with attachment",
+        recipients: ["vannorton@gmail.com"],
+        body: "Enter email body here...",
+        attachments: source
+      }
+      let promise = new Promise((resolve, reject) => {
+        MailComposer.composeAsync(options)
+          .then((result) => {
+            console.log("result is ", result)
+            resolve(result)
+          })
+          .catch((error) => {
+            console.log("error is ", error)
+            reject(error)
+          })
+        })
+        promise.then(
+        result => setStatus("Status: email " + result.status),
+        error => setStatus("Status: email " + error.status)
+       )
     }
+    console.log("status is ", status)
+   
+    
   };
 
   const recordVideo = async () => {
@@ -94,13 +146,35 @@ export function CameraScreen() {
     setVideoSource(null);
   };
 
-  const renderCancelPreviewButton = () => (
-    <TouchableOpacity onPress={cancelPreview} style={styles.closeButton}>
+  const sendEmailWithAttachment = async() => {
+    console.log("sending the picture", source);
+    if ( sendMail([source]) ) {
+      console.log("sendMail returned true ",sendMail.status, sendMail); }
+
+      else { console.log("sendMail returned null"); }
+    
+    await cameraRef.current.resumePreview();
+    setIsPreview(false);
+    setVideoSource(null);
+  };
+
+  const renderSendEmailButton = () => (
+    <TouchableOpacity onPress={sendEmailWithAttachment} style={styles.sendButton}>
       <View style={[styles.closeCross, { transform: [{ rotate: "45deg" }] }]} />
       <View
         style={[styles.closeCross, { transform: [{ rotate: "-45deg" }] }]}
       />
     </TouchableOpacity>
+  );
+
+  const renderCancelPreviewButton = () => (
+    <TouchableOpacity onPress={sendEmailWithAttachment} style={styles.closeButton}>
+      <View style={[styles.closeCross, { transform: [{ rotate: "45deg" }] }]} />
+      <View
+        style={[styles.closeCross, { transform: [{ rotate: "-45deg" }] }]}
+      />
+    </TouchableOpacity>
+    
   );
 
   const renderVideoPlayer = () => (
@@ -154,10 +228,11 @@ export function CameraScreen() {
           console.log("cammera error", error);
         }}
       />
+      
       <View style={styles.container}>
         {isVideoRecording && renderVideoRecordIndicator()}
         {videoSource && renderVideoPlayer()}
-        {isPreview && renderCancelPreviewButton()}
+        {isPreview && renderSendEmailButton() && renderCancelPreviewButton()}
         {!videoSource && !isPreview && renderCaptureControl()}
       </View>
     </SafeAreaView>
@@ -175,6 +250,19 @@ const styles = StyleSheet.create({
     height: closeButtonSize,
     width: closeButtonSize,
     borderRadius: Math.floor(closeButtonSize / 2),
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#c4c5c4",
+    opacity: 0.7,
+    zIndex: 2,
+  },
+  sendButton: {
+    position: "absolute",
+    bottom: 35,
+    right: 15,
+    height: closeButtonSize,
+    width: closeButtonSize,
+    borderRadius: Math.floor(closeButtonSize),
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#c4c5c4",
